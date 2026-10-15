@@ -1,0 +1,23 @@
+[package]
+name = "SuperLightCoder"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+eframe = "0.29"
+egui = "0.29"
+rfd = "0.15"
+winreg = "0.52"
+
+[dev-dependencies]
+image = { version = "0.25", features = ["png", "ico"] }
+
+[build-dependencies]
+winres = "0.1.12"
+
+[profile.release]
+opt-level = "z"
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true
