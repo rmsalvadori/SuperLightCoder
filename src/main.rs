@@ -14,14 +14,18 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 fn main() -> eframe::Result<()> {
-    // Check if a file path was passed as argument (e.g. from Windows context menu)
-    let target_file = env::args().nth(1).map(PathBuf::from);
-
     // Load custom embedded icon
     let icon_data = load_icon();
 
-    // Load previous window size and state
+    // Load previous window size, last opened file and state
     let win_cfg = window_state::load_window_state();
+
+    // Check if a file path was passed as argument (e.g. from Windows context menu or CLI),
+    // otherwise reopen the last opened file if it exists.
+    let target_file = env::args()
+        .nth(1)
+        .map(PathBuf::from)
+        .or_else(|| win_cfg.last_file.clone().filter(|p| p.is_file()));
 
     let (screen_w, screen_h) = get_screen_size();
     let pos_x = ((screen_w as f32 - win_cfg.width) / 2.0).max(0.0);
@@ -41,7 +45,11 @@ fn main() -> eframe::Result<()> {
 
     let options = eframe::NativeOptions {
         viewport,
-        renderer: eframe::Renderer::Glow,
+        renderer: eframe::Renderer::Wgpu,
+        wgpu_options: eframe::egui_wgpu::WgpuConfiguration {
+            present_mode: eframe::egui_wgpu::wgpu::PresentMode::AutoVsync,
+            ..Default::default()
+        },
         ..Default::default()
     };
 

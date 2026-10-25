@@ -21,7 +21,7 @@ pub fn format_code(text: &str, lang: Language) -> String {
         Language::Lua | Language::Ruby => format_lua_ruby(text),
         Language::Markdown => format_markdown(text),
         Language::Toml => format_toml(text),
-        Language::Batch | Language::Htaccess | Language::GitIgnore => format_clean_lines(text),
+        Language::Batch | Language::Htaccess | Language::GitIgnore | Language::Env => format_clean_lines(text),
         Language::PlainText => text.to_string(),
     }
 }

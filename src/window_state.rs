@@ -1,10 +1,12 @@
 use std::path::PathBuf;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct WindowConfig {
     pub width: f32,
     pub height: f32,
     pub maximized: bool,
+    pub last_file: Option<PathBuf>,
+    pub word_wrap: bool,
 }
 
 impl Default for WindowConfig {
@@ -13,6 +15,8 @@ impl Default for WindowConfig {
             width: 980.0,
             height: 680.0,
             maximized: false,
+            last_file: None,
+            word_wrap: false,
         }
     }
 }
@@ -51,6 +55,19 @@ pub fn load_window_state() -> WindowConfig {
                                 config.maximized = m;
                             }
                         }
+                        "last_file" => {
+                            if !parts[1].is_empty() {
+                                let p = PathBuf::from(parts[1]);
+                                if p.is_file() {
+                                    config.last_file = Some(p);
+                                }
+                            }
+                        }
+                        "word_wrap" => {
+                            if let Ok(b) = parts[1].parse::<bool>() {
+                                config.word_wrap = b;
+                            }
+                        }
                         _ => {}
                     }
                 }
@@ -65,12 +82,16 @@ pub fn save_window_state(config: &WindowConfig) {
         let _ = std::fs::create_dir_all(&dir);
         let mut path = dir;
         path.push("window_state.txt");
-        let content = format!(
-            "width={}\nheight={}\nmaximized={}\n",
+        let mut content = format!(
+            "width={}\nheight={}\nmaximized={}\nword_wrap={}\n",
             config.width.round() as i32,
             config.height.round() as i32,
-            config.maximized
+            config.maximized,
+            config.word_wrap
         );
+        if let Some(ref lf) = config.last_file {
+            content.push_str(&format!("last_file={}\n", lf.to_string_lossy()));
+        }
         let _ = std::fs::write(path, content);
     }
 }

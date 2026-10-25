@@ -6,11 +6,12 @@ Um editor de código e texto **extremamente leve**, rápido e responsivo, desenv
 
 ## 🚀 Características Principais
 
-- **Ultra Leve & Portátil**: Executável único compilado nativamente em Rust (~3.5 MB), com backend OpenGL de alta performance livre de tearing ou flickering, consumindo poucos megabytes de RAM e com inicialização instantânea.
+- **Ultra Leve & Portátil**: Executável único compilado nativamente em Rust (~3.5 MB), com motor gráfico moderno WGPU (DirectX 12 / Vulkan nativo no Windows) e VSync ativo, livre de flickering ou tearing, consumindo pouquíssima memória RAM e com inicialização instantânea.
+- **Reabertura Inteligente**: Ao abrir o Super Light Coder sem argumentos, ele restaura e reabre automaticamente o último arquivo trabalhado.
 - **Ícone Nativo Exclusivo ("O Raio Conectado")**: Ícone embutido no `.exe`, no instalador e na barra de tarefas, com formato de raio estilizado cujas pontas superior e inferior simulam os caracteres `<` e `>`.
 - **Navegador de Arquivos Lateral (Explorer)**:
   - 📁 Ícone de pasta na barra de status (com destaque visual azul quando ativo) e atalho `Ctrl + B`.
-  - Exibe a árvore e lista de arquivos da pasta aberta com ícones representativos por tipo (`.rs`, `.py`, `.sql`, `.js`, `.md`, `.htaccess`, `.gitignore`, `.cmd`, `.sh`, `.ps1`, etc.).
+  - Exibe a árvore e lista de arquivos da pasta aberta com ícones representativos por tipo (`.rs`, `.py`, `.sql`, `.js`, `.md`, `.env`, `.htaccess`, `.gitignore`, `.cmd`, `.sh`, `.ps1`, etc.).
   - Suporte completo a arquivos de configuração dotfiles (`.gitignore`, `.htaccess`, `.env`, etc.) sem ocultação acidental.
   - Ao alternar entre arquivos modificados, pergunta de forma inteligente se deseja salvar as alterações antes de prosseguir.
   - Caso nenhum arquivo esteja aberto, exibe um botão amigável para abrir uma pasta.
@@ -25,8 +26,12 @@ Um editor de código e texto **extremamente leve**, rápido e responsivo, desenv
 - **Arrastar e Soltar (Drag & Drop)**:
   - Arraste qualquer arquivo ou pasta do Windows Explorer diretamente para o editor para abrir instantaneamente.
 - **Barra de Informações Inferior**:
-  - 📁 **Explorador de Arquivos** e ⚙ **Configurações** no canto inferior esquerdo com feedback de estado ativo.
-  - 🪄 **Botão de Formatação Rápida**.
+  - 📁 **Explorador**, ⚙ **Configurações**, e botões rápidos ao lado:
+    - 📄 **Novo Arquivo** (`Ctrl + N`)
+    - 📂 **Abrir Arquivo** (`Ctrl + O`)
+    - 💾 **Salvar Arquivo** (`Ctrl + S`, com destaque visual dinâmico quando houver alterações pendentes)
+  - 🪄 **Botão de Formatação Rápida `{ }`**.
+  - ☑ **Quebrar linha**: Checkbox para alternar a quebra automática de linha visual (Soft Wrap) instantaneamente.
   - Posição do cursor: `Ln X, Col Y`.
   - Contagem total de caracteres e seleção (`N caracteres` / `N selecionados`).
   - Seletor rápido de Linguagem (auto-detectado por extensão ou selecionável manualmente).
@@ -45,6 +50,7 @@ Um editor de código e texto **extremamente leve**, rápido e responsivo, desenv
 - **Realce de Sintaxe para Mais de 25 Linguagens e Formatos**:
   - Rust, SQL, Python, JavaScript, TypeScript, HTML, PHP, Java, C, C#, C++, Go, Pascal, Perl, Lua, Ruby, XML, JSON, SVG, TOML e texto puro (`.txt`).
   - **Suporte Completo a Scripts e Configurações**:
+    - 🔑 **Environment (`.env`, `.env.*`)**: Destaque para variáveis `CHAVE=VALOR`, `export`, strings, números, booleanos, interpolações `${VAR}` e comentários `#`.
     - 📝 **Markdown (`.md`)**: Destaque para títulos `#`, listas, links `[texto](url)`, citações `>` e trechos de código embutidos com crases ``` `code` ```.
     - 🔒 **Apache (`.htaccess`)**: Destaque para diretivas (`RewriteRule`, `RewriteCond`, `AuthType`, `Options`), tags `<IfModule>`, variáveis `%{...}` e flags `[NC,L]`.
     - 🐙 **Git (`.gitignore`, `.gitattributes`)**: Destaque para comentários `#`, negações `!`, wildcards `*` e separadores de caminho `/`.

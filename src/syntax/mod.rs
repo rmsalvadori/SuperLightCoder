@@ -34,6 +34,7 @@ pub enum Language {
     Batch,
     Shell,
     PowerShell,
+    Env,
 }
 
 impl Language {
@@ -66,6 +67,7 @@ impl Language {
             Language::Batch,
             Language::Shell,
             Language::PowerShell,
+            Language::Env,
         ]
     }
 
@@ -98,6 +100,7 @@ impl Language {
             Language::Batch => "Batch / CMD (.cmd, .bat)",
             Language::Shell => "Shell Script (.sh)",
             Language::PowerShell => "PowerShell (.ps1)",
+            Language::Env => "Configuração (.env)",
         }
     }
 
@@ -113,6 +116,9 @@ impl Language {
         }
         if file_name == ".gitignore" || file_name == ".gitattributes" || file_name == ".gitmodules" {
             return Language::GitIgnore;
+        }
+        if file_name == ".env" || file_name.starts_with(".env.") || file_name.ends_with(".env") {
+            return Language::Env;
         }
 
         let ext = path
@@ -145,6 +151,7 @@ impl Language {
             "toml" => Language::Toml,
             "htaccess" => Language::Htaccess,
             "gitignore" => Language::GitIgnore,
+            "env" => Language::Env,
             "cmd" | "bat" => Language::Batch,
             "sh" | "bash" | "zsh" => Language::Shell,
             "ps1" | "psm1" | "psd1" => Language::PowerShell,
@@ -403,6 +410,10 @@ pub fn highlight(text: &str, lang: Language, colors: &ThemeColors, font_size: f3
 
     if lang == Language::PowerShell {
         return highlight_powershell(text, colors, font_size);
+    }
+
+    if lang == Language::Env {
+        return highlight_env(text, colors, font_size);
     }
 
     if matches!(lang, Language::Html | Language::Xml | Language::Svg) {
@@ -1917,6 +1928,205 @@ fn highlight_powershell(text: &str, colors: &ThemeColors, font_size: f32) -> Lay
     job
 }
 
+fn highlight_env(text: &str, colors: &ThemeColors, font_size: f32) -> LayoutJob {
+    let mut job = LayoutJob::default();
+    let font_id = FontId::monospace(font_size);
+
+    for line in text.split_inclusive('\n') {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with('#') {
+            job.append(
+                line,
+                0.0,
+                TextFormat {
+                    font_id: font_id.clone(),
+                    color: colors.syn_comment,
+                    ..Default::default()
+                },
+            );
+            continue;
+        }
+
+        let chars: Vec<char> = line.chars().collect();
+        let len = chars.len();
+        let mut i = 0;
+
+        let ws_start = i;
+        while i < len && chars[i].is_whitespace() && chars[i] != '\n' {
+            i += 1;
+        }
+        if i > ws_start {
+            let s: String = chars[ws_start..i].iter().collect();
+            job.append(
+                &s,
+                0.0,
+                TextFormat {
+                    font_id: font_id.clone(),
+                    color: colors.text_editor,
+                    ..Default::default()
+                },
+            );
+        }
+
+        if i + 7 <= len {
+            let prefix: String = chars[i..i + 7].iter().collect();
+            if prefix == "export " {
+                job.append(
+                    &prefix,
+                    0.0,
+                    TextFormat {
+                        font_id: font_id.clone(),
+                        color: colors.syn_keyword,
+                        ..Default::default()
+                    },
+                );
+                i += 7;
+            }
+        }
+
+        let key_start = i;
+        while i < len && chars[i] != '=' && chars[i] != ':' && chars[i] != '\n' && chars[i] != '#' {
+            i += 1;
+        }
+        if i > key_start {
+            let key: String = chars[key_start..i].iter().collect();
+            job.append(
+                &key,
+                0.0,
+                TextFormat {
+                    font_id: font_id.clone(),
+                    color: colors.syn_attribute,
+                    ..Default::default()
+                },
+            );
+        }
+
+        if i < len && (chars[i] == '=' || chars[i] == ':') {
+            job.append(
+                &chars[i].to_string(),
+                0.0,
+                TextFormat {
+                    font_id: font_id.clone(),
+                    color: colors.syn_operator,
+                    ..Default::default()
+                },
+            );
+            i += 1;
+        }
+
+        while i < len {
+            if chars[i] == '#' {
+                let comment: String = chars[i..].iter().collect();
+                job.append(
+                    &comment,
+                    0.0,
+                    TextFormat {
+                        font_id: font_id.clone(),
+                        color: colors.syn_comment,
+                        ..Default::default()
+                    },
+                );
+                break;
+            }
+
+            if chars[i] == '"' || chars[i] == '\'' {
+                let q = chars[i];
+                let start = i;
+                i += 1;
+                while i < len && chars[i] != q && chars[i] != '\n' {
+                    if chars[i] == '\\' && i + 1 < len {
+                        i += 2;
+                        continue;
+                    }
+                    i += 1;
+                }
+                if i < len && chars[i] == q {
+                    i += 1;
+                }
+                let s: String = chars[start..i].iter().collect();
+                job.append(
+                    &s,
+                    0.0,
+                    TextFormat {
+                        font_id: font_id.clone(),
+                        color: colors.syn_string,
+                        ..Default::default()
+                    },
+                );
+                continue;
+            }
+
+            if chars[i] == '$' {
+                let start = i;
+                i += 1;
+                if i < len && chars[i] == '{' {
+                    while i < len && chars[i] != '}' && chars[i] != '\n' {
+                        i += 1;
+                    }
+                    if i < len && chars[i] == '}' {
+                        i += 1;
+                    }
+                } else {
+                    while i < len && (chars[i].is_alphanumeric() || chars[i] == '_') {
+                        i += 1;
+                    }
+                }
+                let s: String = chars[start..i].iter().collect();
+                job.append(
+                    &s,
+                    0.0,
+                    TextFormat {
+                        font_id: font_id.clone(),
+                        color: colors.syn_type,
+                        ..Default::default()
+                    },
+                );
+                continue;
+            }
+
+            if chars[i].is_alphanumeric() || chars[i] == '_' || chars[i] == '-' || chars[i] == '.' {
+                let start = i;
+                while i < len && (chars[i].is_alphanumeric() || chars[i] == '_' || chars[i] == '-' || chars[i] == '.') {
+                    i += 1;
+                }
+                let word: String = chars[start..i].iter().collect();
+                let lower = word.to_lowercase();
+                let color = if lower == "true" || lower == "false" || lower == "yes" || lower == "no" || lower == "null" {
+                    colors.syn_keyword
+                } else if word.chars().all(|c| c.is_ascii_digit() || c == '.') {
+                    colors.syn_number
+                } else {
+                    colors.text_editor
+                };
+                job.append(
+                    &word,
+                    0.0,
+                    TextFormat {
+                        font_id: font_id.clone(),
+                        color,
+                        ..Default::default()
+                    },
+                );
+                continue;
+            }
+
+            let c = chars[i];
+            job.append(
+                &c.to_string(),
+                0.0,
+                TextFormat {
+                    font_id: font_id.clone(),
+                    color: colors.text_editor,
+                    ..Default::default()
+                },
+            );
+            i += 1;
+        }
+    }
+
+    job
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1928,6 +2138,10 @@ mod tests {
         assert_eq!(Language::from_path(Path::new("subdir/.htaccess")), Language::Htaccess);
         assert_eq!(Language::from_path(Path::new(".gitignore")), Language::GitIgnore);
         assert_eq!(Language::from_path(Path::new(".gitmodules")), Language::GitIgnore);
+        assert_eq!(Language::from_path(Path::new(".env")), Language::Env);
+        assert_eq!(Language::from_path(Path::new(".env.local")), Language::Env);
+        assert_eq!(Language::from_path(Path::new(".env.production")), Language::Env);
+        assert_eq!(Language::from_path(Path::new("my.env")), Language::Env);
         assert_eq!(Language::from_path(Path::new("build.cmd")), Language::Batch);
         assert_eq!(Language::from_path(Path::new("install.bat")), Language::Batch);
         assert_eq!(Language::from_path(Path::new("deploy.sh")), Language::Shell);
@@ -1950,6 +2164,10 @@ mod tests {
 
         let gitignore = "# Comment\nnode_modules/\n*.log\n!important.log";
         let job = highlight(gitignore, Language::GitIgnore, &colors, font_size);
+        assert!(!job.sections.is_empty());
+
+        let env_text = "# Config\nPORT=8080\nDB_PASS=\"secret\"\nDEBUG=true";
+        let job = highlight(env_text, Language::Env, &colors, font_size);
         assert!(!job.sections.is_empty());
 
         let cmd = "@echo off\nset VAR=value\ngoto end\n:end\npause";

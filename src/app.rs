@@ -348,6 +348,7 @@ pub struct SuperLightCoderApp {
 
     pub status_message: Option<(String, Instant)>,
     pub context_menu_active: bool,
+    pub word_wrap: bool,
     pub win_config: crate::window_state::WindowConfig,
 }
 
@@ -358,6 +359,7 @@ impl SuperLightCoderApp {
             .as_ref()
             .map(|f| FileItem::scan_dir(f))
             .unwrap_or_default();
+        let word_wrap = win_config.word_wrap;
 
         let mut app = Self {
             text: String::new(),
@@ -389,6 +391,7 @@ impl SuperLightCoderApp {
 
             status_message: None,
             context_menu_active: registry::is_context_menu_registered(),
+            word_wrap,
             win_config,
         };
 
@@ -413,6 +416,8 @@ impl SuperLightCoderApp {
                 self.file_path = Some(path.clone());
                 self.is_modified = false;
                 self.history.clear();
+                self.win_config.last_file = Some(path.clone());
+                crate::window_state::save_window_state(&self.win_config);
                 self.set_status(format!("Arquivo aberto: {}", path.display()));
             }
             Err(e) => {
@@ -514,6 +519,8 @@ impl SuperLightCoderApp {
             match std::fs::write(&path, to_write) {
                 Ok(_) => {
                     self.is_modified = false;
+                    self.win_config.last_file = Some(path.clone());
+                    crate::window_state::save_window_state(&self.win_config);
                     self.set_status(format!("Arquivo salvo: {}", path.display()));
                 }
                 Err(e) => {
@@ -548,6 +555,8 @@ impl SuperLightCoderApp {
                     self.language = Language::from_path(&new_path);
                     self.file_path = Some(new_path.clone());
                     self.is_modified = false;
+                    self.win_config.last_file = Some(new_path.clone());
+                    crate::window_state::save_window_state(&self.win_config);
                     self.set_status(format!("Arquivo salvo como: {}", new_path.display()));
                 }
                 Err(e) => {
@@ -1519,11 +1528,14 @@ impl SuperLightCoderApp {
 
                     let lower_name = item.name.to_lowercase();
                     let ext = item.path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+                    let is_env = lower_name == ".env" || lower_name.starts_with(".env.") || lower_name.ends_with(".env") || ext == "env";
 
                     let icon = if lower_name == ".htaccess" || lower_name.ends_with(".htaccess") {
                         "🔒"
                     } else if lower_name == ".gitignore" || lower_name == ".gitattributes" || lower_name == ".gitmodules" {
                         "🐙"
+                    } else if is_env {
+                        "🔑"
                     } else {
                         match ext.as_str() {
                             "rs" => "🦀",
@@ -1769,6 +1781,59 @@ impl eframe::App for SuperLightCoderApp {
                         self.show_settings = !self.show_settings;
                     }
 
+                    // Botão Novo Arquivo 📄
+                    let new_file_btn = ui.add(
+                        egui::Button::new(
+                            egui::RichText::new("📄")
+                                .color(colors.text_bottom_bar)
+                                .size(14.0),
+                        )
+                        .frame(false),
+                    );
+                    if new_file_btn
+                        .on_hover_text("Novo Arquivo (Ctrl+N)")
+                        .clicked()
+                    {
+                        self.request_new_file();
+                    }
+
+                    // Botão Abrir Arquivo 📂
+                    let open_file_btn = ui.add(
+                        egui::Button::new(
+                            egui::RichText::new("📂")
+                                .color(colors.text_bottom_bar)
+                                .size(14.0),
+                        )
+                        .frame(false),
+                    );
+                    if open_file_btn
+                        .on_hover_text("Abrir Arquivo (Ctrl+O)")
+                        .clicked()
+                    {
+                        self.request_open_file();
+                    }
+
+                    // Botão Salvar Arquivo 💾
+                    let save_color = if self.is_modified {
+                        colors.syn_keyword
+                    } else {
+                        colors.text_bottom_bar
+                    };
+                    let save_file_btn = ui.add(
+                        egui::Button::new(
+                            egui::RichText::new("💾")
+                                .color(save_color)
+                                .size(14.0),
+                        )
+                        .frame(false),
+                    );
+                    if save_file_btn
+                        .on_hover_text("Salvar Arquivo (Ctrl+S)")
+                        .clicked()
+                    {
+                        self.save_file();
+                    }
+
                     ui.separator();
 
                     // Format code quick button { }
@@ -1785,6 +1850,28 @@ impl eframe::App for SuperLightCoderApp {
                         .clicked()
                     {
                         self.format_document();
+                    }
+
+                    ui.separator();
+
+                    // Checkbox para quebra de linha automática (só visual)
+                    let wrap_color = if self.word_wrap {
+                        colors.syn_keyword
+                    } else {
+                        colors.text_bottom_bar
+                    };
+                    let wrap_resp = ui.checkbox(
+                        &mut self.word_wrap,
+                        egui::RichText::new("Quebrar linha")
+                            .color(wrap_color)
+                            .size(12.0),
+                    );
+                    if wrap_resp
+                        .on_hover_text("Quebrar automaticamente a linha (só visual)")
+                        .changed()
+                    {
+                        self.win_config.word_wrap = self.word_wrap;
+                        crate::window_state::save_window_state(&self.win_config);
                     }
 
                     // Temporary status alert
@@ -1924,7 +2011,12 @@ impl eframe::App for SuperLightCoderApp {
                     }),
             )
             .show(ctx, |ui| {
-                egui::ScrollArea::both()
+                let scroll_area = if self.word_wrap {
+                    egui::ScrollArea::vertical()
+                } else {
+                    egui::ScrollArea::both()
+                };
+                scroll_area
                     .auto_shrink([false, false])
                     .show(ui, |ui| {
                         ui.spacing_mut().item_spacing.x = 2.0;
@@ -1980,19 +2072,28 @@ impl eframe::App for SuperLightCoderApp {
                             ui.add(egui::Separator::default().vertical().spacing(4.0));
 
                             // Code Text Editor with Search Highlighting
-                            let mut layouter = |ui: &egui::Ui, text: &str, _wrap_width: f32| {
-                                let mut job = crate::syntax::highlight(text, self.language, &colors, font_size);
-                                if self.find_replace.is_open && !self.find_replace.matches.is_empty() {
-                                    let byte_matches: Vec<(usize, usize)> = self
-                                        .find_replace
-                                        .matches
+                            let word_wrap = self.word_wrap;
+                            let current_lang = self.language;
+                            let find_is_open = self.find_replace.is_open;
+                            let find_matches = self.find_replace.matches.clone();
+                            let find_current = self.find_replace.current_match;
+                            let colors_for_layout = &colors;
+                            let mut layouter = move |ui: &egui::Ui, text: &str, wrap_width: f32| {
+                                let mut job = crate::syntax::highlight(text, current_lang, colors_for_layout, font_size);
+                                if word_wrap {
+                                    job.wrap.max_width = wrap_width;
+                                } else {
+                                    job.wrap.max_width = f32::INFINITY;
+                                }
+                                if find_is_open && !find_matches.is_empty() {
+                                    let byte_matches: Vec<(usize, usize)> = find_matches
                                         .iter()
                                         .map(|m| (m.byte_start, m.byte_end))
                                         .collect();
                                     crate::syntax::apply_search_highlights(
                                         &mut job,
                                         &byte_matches,
-                                        self.find_replace.current_match,
+                                        find_current,
                                     );
                                 }
                                 ui.fonts(|f| f.layout_job(job))
@@ -2042,16 +2143,20 @@ impl eframe::App for SuperLightCoderApp {
                                 });
                             }
 
-                            let output = egui::TextEdit::multiline(&mut self.text)
+                            let mut text_edit = egui::TextEdit::multiline(&mut self.text)
                                 .id(editor_id)
                                 .font(egui::FontId::monospace(font_size))
                                 .code_editor()
                                 .lock_focus(true)
                                 .interactive(!is_alt_down && !is_multi_active)
-                                .desired_width(f32::INFINITY)
                                 .layouter(&mut layouter)
-                                .frame(false)
-                                .show(ui);
+                                .frame(false);
+
+                            if !self.word_wrap {
+                                text_edit = text_edit.desired_width(f32::INFINITY);
+                            }
+
+                            let output = text_edit.show(ui);
 
                             let editor_response = &output.response;
                             let editor_rect = editor_response.rect;
