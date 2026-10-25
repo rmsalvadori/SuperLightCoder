@@ -32,11 +32,11 @@ impl FileItem {
             for entry in entries.flatten() {
                 let path = entry.path();
                 let name = entry.file_name().to_string_lossy().to_string();
-                if name.starts_with('.') {
-                    continue;
-                }
                 let is_dir = path.is_dir();
                 if is_dir {
+                    if name.starts_with('.') {
+                        continue;
+                    }
                     dirs.push(FileItem {
                         name,
                         path,
@@ -1517,16 +1517,33 @@ impl SuperLightCoderApp {
                         .map(|p| p == &item.path)
                         .unwrap_or(false);
 
-                    let icon = match item.path.extension().and_then(|e| e.to_str()).unwrap_or("") {
-                        "rs" => "🦀",
-                        "sql" => "🗄",
-                        "json" => "📋",
-                        "toml" | "yaml" | "yml" => "⚙",
-                        "md" => "📝",
-                        "html" | "htm" | "xml" | "svg" => "🌐",
-                        "js" | "ts" => "🟨",
-                        "py" => "🐍",
-                        _ => "📄",
+                    let lower_name = item.name.to_lowercase();
+                    let ext = item.path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+
+                    let icon = if lower_name == ".htaccess" || lower_name.ends_with(".htaccess") {
+                        "🔒"
+                    } else if lower_name == ".gitignore" || lower_name == ".gitattributes" || lower_name == ".gitmodules" {
+                        "🐙"
+                    } else {
+                        match ext.as_str() {
+                            "rs" => "🦀",
+                            "sql" => "🗄",
+                            "json" => "📋",
+                            "toml" | "yaml" | "yml" => "⚙",
+                            "md" | "markdown" => "📝",
+                            "html" | "htm" | "xml" | "svg" => "🌐",
+                            "js" | "mjs" | "cjs" | "jsx" | "ts" | "tsx" => "🟨",
+                            "py" | "pyw" => "🐍",
+                            "cmd" | "bat" => "⚡",
+                            "sh" | "bash" | "zsh" => "🐚",
+                            "ps1" | "psm1" | "psd1" => "💠",
+                            "c" | "h" | "cpp" | "hpp" | "cc" | "cxx" => "🔷",
+                            "cs" => "🟣",
+                            "java" => "☕",
+                            "php" => "🐘",
+                            "go" => "🐹",
+                            _ => "📄",
+                        }
                     };
 
                     let text_color = if is_active {

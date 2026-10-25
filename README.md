@@ -6,11 +6,12 @@ Um editor de código e texto **extremamente leve**, rápido e responsivo, desenv
 
 ## 🚀 Características Principais
 
-- **Ultra Leve & Portátil**: Executável único compilado nativamente em Rust, consumindo poucos megabytes de RAM e com inicialização instantânea.
+- **Ultra Leve & Portátil**: Executável único compilado nativamente em Rust (~3.5 MB), com backend OpenGL de alta performance livre de tearing ou flickering, consumindo poucos megabytes de RAM e com inicialização instantânea.
 - **Ícone Nativo Exclusivo ("O Raio Conectado")**: Ícone embutido no `.exe`, no instalador e na barra de tarefas, com formato de raio estilizado cujas pontas superior e inferior simulam os caracteres `<` e `>`.
 - **Navegador de Arquivos Lateral (Explorer)**:
   - 📁 Ícone de pasta na barra de status (com destaque visual azul quando ativo) e atalho `Ctrl + B`.
-  - Exibe a árvore e lista de arquivos da pasta aberta com ícones representativos por tipo (`.rs`, `.py`, `.sql`, `.js`, etc.).
+  - Exibe a árvore e lista de arquivos da pasta aberta com ícones representativos por tipo (`.rs`, `.py`, `.sql`, `.js`, `.md`, `.htaccess`, `.gitignore`, `.cmd`, `.sh`, `.ps1`, etc.).
+  - Suporte completo a arquivos de configuração dotfiles (`.gitignore`, `.htaccess`, `.env`, etc.) sem ocultação acidental.
   - Ao alternar entre arquivos modificados, pergunta de forma inteligente se deseja salvar as alterações antes de prosseguir.
   - Caso nenhum arquivo esteja aberto, exibe um botão amigável para abrir uma pasta.
 - **Edição em Coluna / Multi-Cursor (Estilo VSCode / Sublime)**:
@@ -41,8 +42,15 @@ Um editor de código e texto **extremamente leve**, rápido e responsivo, desenv
 - **Temas**:
   - 🌙 **Tema Escuro (Dark)** (moderno e confortável para os olhos).
   - ☀️ **Tema Claro (Light)** (clássico e limpo estilo bloco de notas).
-- **Realce de Sintaxe para Mais de 20 Linguagens**:
-  - Rust, SQL, Python, JavaScript, TypeScript, HTML, PHP, Java, C, C#, C++, Go, Pascal, Perl, Lua, Ruby, XML, JSON, Markdown, SVG e texto puro (`.txt`).
+- **Realce de Sintaxe para Mais de 25 Linguagens e Formatos**:
+  - Rust, SQL, Python, JavaScript, TypeScript, HTML, PHP, Java, C, C#, C++, Go, Pascal, Perl, Lua, Ruby, XML, JSON, SVG, TOML e texto puro (`.txt`).
+  - **Suporte Completo a Scripts e Configurações**:
+    - 📝 **Markdown (`.md`)**: Destaque para títulos `#`, listas, links `[texto](url)`, citações `>` e trechos de código embutidos com crases ``` `code` ```.
+    - 🔒 **Apache (`.htaccess`)**: Destaque para diretivas (`RewriteRule`, `RewriteCond`, `AuthType`, `Options`), tags `<IfModule>`, variáveis `%{...}` e flags `[NC,L]`.
+    - 🐙 **Git (`.gitignore`, `.gitattributes`)**: Destaque para comentários `#`, negações `!`, wildcards `*` e separadores de caminho `/`.
+    - ⚡ **Batch / Windows CMD (`.cmd`, `.bat`)**: Comentários `REM` / `::`, comandos internos (`echo`, `set`, `goto`, `call`), variáveis `%VAR%` / `!VAR!` e labels `:label`.
+    - 🐚 **Shell Script (`.sh`, `.bash`, `.zsh`)**: Shebangs, comentários `#`, comandos, variáveis de ambiente `$VAR` e estruturas de controle.
+    - 💠 **PowerShell (`.ps1`, `.psm1`, `.psd1`)**: Comentários `#` e `<# #>`, cmdlets (`Get-*`, `Set-*`, `Write-*`), parâmetros `-Name` e variáveis `$var`.
 - **Formatadores de Código Embutidos (Zero Dependências Externas)**:
   - **SQL**: Quebra consultas de linha única em múltiplas linhas identadas com destaque para palavras-chave (`SELECT`, `FROM`, `WHERE`, `JOIN`, `GROUP BY`, `ORDER BY`, `LIMIT`, etc.).
   - **JSON**: Formatação e identação em árvore de JSON comprimido.

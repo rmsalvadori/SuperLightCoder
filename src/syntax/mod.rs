@@ -29,6 +29,11 @@ pub enum Language {
     Markdown,
     Svg,
     Toml,
+    Htaccess,
+    GitIgnore,
+    Batch,
+    Shell,
+    PowerShell,
 }
 
 impl Language {
@@ -56,6 +61,11 @@ impl Language {
             Language::Markdown,
             Language::Svg,
             Language::Toml,
+            Language::Htaccess,
+            Language::GitIgnore,
+            Language::Batch,
+            Language::Shell,
+            Language::PowerShell,
         ]
     }
 
@@ -83,10 +93,28 @@ impl Language {
             Language::Markdown => "Markdown (MD)",
             Language::Svg => "SVG",
             Language::Toml => "TOML",
+            Language::Htaccess => "Apache (.htaccess)",
+            Language::GitIgnore => "Git Ignore (.gitignore)",
+            Language::Batch => "Batch / CMD (.cmd, .bat)",
+            Language::Shell => "Shell Script (.sh)",
+            Language::PowerShell => "PowerShell (.ps1)",
         }
     }
 
     pub fn from_path(path: &Path) -> Self {
+        let file_name = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("")
+            .to_lowercase();
+
+        if file_name == ".htaccess" || file_name.ends_with(".htaccess") {
+            return Language::Htaccess;
+        }
+        if file_name == ".gitignore" || file_name == ".gitattributes" || file_name == ".gitmodules" {
+            return Language::GitIgnore;
+        }
+
         let ext = path
             .extension()
             .and_then(|e| e.to_str())
@@ -115,6 +143,11 @@ impl Language {
             "md" | "markdown" => Language::Markdown,
             "svg" => Language::Svg,
             "toml" => Language::Toml,
+            "htaccess" => Language::Htaccess,
+            "gitignore" => Language::GitIgnore,
+            "cmd" | "bat" => Language::Batch,
+            "sh" | "bash" | "zsh" => Language::Shell,
+            "ps1" | "psm1" | "psd1" => Language::PowerShell,
             _ => Language::PlainText,
         }
     }
@@ -350,6 +383,26 @@ pub fn highlight(text: &str, lang: Language, colors: &ThemeColors, font_size: f3
 
     if lang == Language::Markdown {
         return highlight_markdown(text, colors, font_size);
+    }
+
+    if lang == Language::Htaccess {
+        return highlight_htaccess(text, colors, font_size);
+    }
+
+    if lang == Language::GitIgnore {
+        return highlight_gitignore(text, colors, font_size);
+    }
+
+    if lang == Language::Batch {
+        return highlight_batch(text, colors, font_size);
+    }
+
+    if lang == Language::Shell {
+        return highlight_shell(text, colors, font_size);
+    }
+
+    if lang == Language::PowerShell {
+        return highlight_powershell(text, colors, font_size);
     }
 
     if matches!(lang, Language::Html | Language::Xml | Language::Svg) {
@@ -793,6 +846,8 @@ fn highlight_markdown(text: &str, colors: &ThemeColors, font_size: f32) -> Layou
             || trimmed.starts_with("## ")
             || trimmed.starts_with("### ")
             || trimmed.starts_with("#### ")
+            || trimmed.starts_with("##### ")
+            || trimmed.starts_with("###### ")
         {
             job.append(
                 line,
@@ -813,33 +868,6 @@ fn highlight_markdown(text: &str, colors: &ThemeColors, font_size: f32) -> Layou
                     ..Default::default()
                 },
             );
-        } else if trimmed.starts_with("- ")
-            || trimmed.starts_with("* ")
-            || trimmed.starts_with("+ ")
-            || (trimmed.len() > 2
-                && trimmed.chars().next().map_or(false, |c| c.is_ascii_digit())
-                && trimmed.contains(". "))
-        {
-            let bullet_len = line.len() - trimmed.len() + 2;
-            let (bullet, rest) = line.split_at(bullet_len.min(line.len()));
-            job.append(
-                bullet,
-                0.0,
-                TextFormat {
-                    font_id: font_id.clone(),
-                    color: colors.syn_operator,
-                    ..Default::default()
-                },
-            );
-            job.append(
-                rest,
-                0.0,
-                TextFormat {
-                    font_id: font_id.clone(),
-                    color: colors.text_editor,
-                    ..Default::default()
-                },
-            );
         } else if trimmed.starts_with("```") {
             job.append(
                 line,
@@ -851,15 +879,133 @@ fn highlight_markdown(text: &str, colors: &ThemeColors, font_size: f32) -> Layou
                 },
             );
         } else {
-            job.append(
-                line,
-                0.0,
-                TextFormat {
-                    font_id: font_id.clone(),
-                    color: colors.text_editor,
-                    ..Default::default()
-                },
-            );
+            let (bullet_prefix, content) = if trimmed.starts_with("- ")
+                || trimmed.starts_with("* ")
+                || trimmed.starts_with("+ ")
+            {
+                let prefix_len = line.len() - trimmed.len() + 2;
+                line.split_at(prefix_len.min(line.len()))
+            } else if trimmed.len() > 2
+                && trimmed.chars().next().map_or(false, |c| c.is_ascii_digit())
+                && trimmed.contains(". ")
+            {
+                let dot_idx = trimmed.find(". ").unwrap() + 2;
+                let prefix_len = line.len() - trimmed.len() + dot_idx;
+                line.split_at(prefix_len.min(line.len()))
+            } else {
+                ("", line)
+            };
+
+            if !bullet_prefix.is_empty() {
+                job.append(
+                    bullet_prefix,
+                    0.0,
+                    TextFormat {
+                        font_id: font_id.clone(),
+                        color: colors.syn_operator,
+                        ..Default::default()
+                    },
+                );
+            }
+
+            let chars: Vec<char> = content.chars().collect();
+            let c_len = chars.len();
+            let mut j = 0;
+            while j < c_len {
+                if chars[j] == '`' {
+                    let start = j;
+                    j += 1;
+                    while j < c_len && chars[j] != '`' && chars[j] != '\n' {
+                        j += 1;
+                    }
+                    if j < c_len && chars[j] == '`' {
+                        j += 1;
+                    }
+                    let s: String = chars[start..j].iter().collect();
+                    job.append(
+                        &s,
+                        0.0,
+                        TextFormat {
+                            font_id: font_id.clone(),
+                            color: colors.syn_type,
+                            ..Default::default()
+                        },
+                    );
+                    continue;
+                }
+
+                if j + 1 < c_len && chars[j] == '*' && chars[j + 1] == '*' {
+                    let start = j;
+                    j += 2;
+                    while j < c_len && !(chars[j] == '*' && chars[j + 1] == '*') && chars[j] != '\n' {
+                        j += 1;
+                    }
+                    if j + 1 < c_len && chars[j] == '*' && chars[j + 1] == '*' {
+                        j += 2;
+                    }
+                    let s: String = chars[start..j].iter().collect();
+                    job.append(
+                        &s,
+                        0.0,
+                        TextFormat {
+                            font_id: font_id.clone(),
+                            color: colors.syn_string,
+                            ..Default::default()
+                        },
+                    );
+                    continue;
+                }
+
+                if chars[j] == '[' {
+                    let start = j;
+                    while j < c_len && chars[j] != ']' && chars[j] != '\n' {
+                        j += 1;
+                    }
+                    if j < c_len && chars[j] == ']' {
+                        j += 1;
+                        if j < c_len && chars[j] == '(' {
+                            while j < c_len && chars[j] != ')' && chars[j] != '\n' {
+                                j += 1;
+                            }
+                            if j < c_len && chars[j] == ')' {
+                                j += 1;
+                            }
+                        }
+                        let s: String = chars[start..j].iter().collect();
+                        job.append(
+                            &s,
+                            0.0,
+                            TextFormat {
+                                font_id: font_id.clone(),
+                                color: colors.syn_function,
+                                ..Default::default()
+                            },
+                        );
+                        continue;
+                    } else {
+                        j = start;
+                    }
+                }
+
+                let start = j;
+                while j < c_len
+                    && chars[j] != '`'
+                    && !(j + 1 < c_len && chars[j] == '*' && chars[j + 1] == '*')
+                    && chars[j] != '['
+                {
+                    j += 1;
+                }
+                let s: String = chars[start..j].iter().collect();
+                job.append(
+                    &s,
+                    0.0,
+                    TextFormat {
+                        font_id: font_id.clone(),
+                        color: colors.text_editor,
+                        ..Default::default()
+                    },
+                );
+            }
         }
     }
 
@@ -1002,4 +1148,820 @@ fn highlight_toml(text: &str, colors: &ThemeColors, font_size: f32) -> LayoutJob
     }
 
     job
+}
+
+fn highlight_gitignore(text: &str, colors: &ThemeColors, font_size: f32) -> LayoutJob {
+    let mut job = LayoutJob::default();
+    let font_id = FontId::monospace(font_size);
+
+    for line in text.split_inclusive('\n') {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with('#') {
+            job.append(
+                line,
+                0.0,
+                TextFormat {
+                    font_id: font_id.clone(),
+                    color: colors.syn_comment,
+                    ..Default::default()
+                },
+            );
+            continue;
+        }
+
+        let chars: Vec<char> = line.chars().collect();
+        let len = chars.len();
+        let mut i = 0;
+
+        while i < len {
+            if chars[i] == '!' {
+                job.append(
+                    "!",
+                    0.0,
+                    TextFormat {
+                        font_id: font_id.clone(),
+                        color: colors.syn_keyword,
+                        ..Default::default()
+                    },
+                );
+                i += 1;
+            } else if chars[i] == '*' || chars[i] == '?' {
+                let start = i;
+                while i < len && (chars[i] == '*' || chars[i] == '?') {
+                    i += 1;
+                }
+                let s: String = chars[start..i].iter().collect();
+                job.append(
+                    &s,
+                    0.0,
+                    TextFormat {
+                        font_id: font_id.clone(),
+                        color: colors.syn_type,
+                        ..Default::default()
+                    },
+                );
+            } else if chars[i] == '/' {
+                job.append(
+                    "/",
+                    0.0,
+                    TextFormat {
+                        font_id: font_id.clone(),
+                        color: colors.syn_operator,
+                        ..Default::default()
+                    },
+                );
+                i += 1;
+            } else {
+                let start = i;
+                while i < len && chars[i] != '!' && chars[i] != '*' && chars[i] != '?' && chars[i] != '/' {
+                    i += 1;
+                }
+                let s: String = chars[start..i].iter().collect();
+                job.append(
+                    &s,
+                    0.0,
+                    TextFormat {
+                        font_id: font_id.clone(),
+                        color: colors.text_editor,
+                        ..Default::default()
+                    },
+                );
+            }
+        }
+    }
+
+    job
+}
+
+fn highlight_htaccess(text: &str, colors: &ThemeColors, font_size: f32) -> LayoutJob {
+    let mut job = LayoutJob::default();
+    let font_id = FontId::monospace(font_size);
+
+    let directives = [
+        "RewriteEngine", "RewriteRule", "RewriteCond", "RewriteBase", "RewriteMap",
+        "Options", "AllowOverride", "Order", "Allow", "Deny", "Require",
+        "AuthType", "AuthName", "AuthUserFile", "AuthGroupFile", "Header",
+        "ErrorDocument", "DirectoryIndex", "SetEnv", "SetEnvIf", "AddType",
+        "AddHandler", "ExpiresActive", "ExpiresDefault", "ExpiresByType",
+        "FileETag", "Redirect", "RedirectMatch", "IndexIgnore", "IndexOptions",
+        "ForceType", "Satisfy", "LimitRequestBody", "ServerSignature",
+    ];
+
+    for line in text.split_inclusive('\n') {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with('#') {
+            job.append(
+                line,
+                0.0,
+                TextFormat {
+                    font_id: font_id.clone(),
+                    color: colors.syn_comment,
+                    ..Default::default()
+                },
+            );
+            continue;
+        }
+
+        let chars: Vec<char> = line.chars().collect();
+        let len = chars.len();
+        let mut i = 0;
+
+        while i < len {
+            // XML-like tags <IfModule ...> </IfModule>
+            if chars[i] == '<' {
+                let start = i;
+                while i < len && chars[i] != '>' && chars[i] != '\n' {
+                    i += 1;
+                }
+                if i < len && chars[i] == '>' {
+                    i += 1;
+                }
+                let tag: String = chars[start..i].iter().collect();
+                job.append(
+                    &tag,
+                    0.0,
+                    TextFormat {
+                        font_id: font_id.clone(),
+                        color: colors.syn_function,
+                        ..Default::default()
+                    },
+                );
+                continue;
+            }
+
+            // Flags [NC,L,QSA]
+            if chars[i] == '[' {
+                let start = i;
+                while i < len && chars[i] != ']' && chars[i] != '\n' {
+                    i += 1;
+                }
+                if i < len && chars[i] == ']' {
+                    i += 1;
+                }
+                let s: String = chars[start..i].iter().collect();
+                job.append(
+                    &s,
+                    0.0,
+                    TextFormat {
+                        font_id: font_id.clone(),
+                        color: colors.syn_type,
+                        ..Default::default()
+                    },
+                );
+                continue;
+            }
+
+            // Variables %{HTTP_HOST}
+            if chars[i] == '%' && i + 1 < len && chars[i + 1] == '{' {
+                let start = i;
+                while i < len && chars[i] != '}' && chars[i] != '\n' {
+                    i += 1;
+                }
+                if i < len && chars[i] == '}' {
+                    i += 1;
+                }
+                let s: String = chars[start..i].iter().collect();
+                job.append(
+                    &s,
+                    0.0,
+                    TextFormat {
+                        font_id: font_id.clone(),
+                        color: colors.syn_operator,
+                        ..Default::default()
+                    },
+                );
+                continue;
+            }
+
+            // Strings "..." or '...'
+            if chars[i] == '"' || chars[i] == '\'' {
+                let q = chars[i];
+                let start = i;
+                i += 1;
+                while i < len && chars[i] != q && chars[i] != '\n' {
+                    i += 1;
+                }
+                if i < len && chars[i] == q {
+                    i += 1;
+                }
+                let s: String = chars[start..i].iter().collect();
+                job.append(
+                    &s,
+                    0.0,
+                    TextFormat {
+                        font_id: font_id.clone(),
+                        color: colors.syn_string,
+                        ..Default::default()
+                    },
+                );
+                continue;
+            }
+
+            // Word check (Directives, options, etc.)
+            if chars[i].is_alphanumeric() || chars[i] == '_' || chars[i] == '-' {
+                let start = i;
+                while i < len && (chars[i].is_alphanumeric() || chars[i] == '_' || chars[i] == '-') {
+                    i += 1;
+                }
+                let word: String = chars[start..i].iter().collect();
+                let is_dir = directives.iter().any(|d| d.eq_ignore_ascii_case(&word));
+                let color = if is_dir {
+                    colors.syn_keyword
+                } else if word.starts_with('-') {
+                    colors.syn_operator
+                } else {
+                    colors.text_editor
+                };
+                job.append(
+                    &word,
+                    0.0,
+                    TextFormat {
+                        font_id: font_id.clone(),
+                        color,
+                        ..Default::default()
+                    },
+                );
+                continue;
+            }
+
+            let c = chars[i];
+            let color = match c {
+                '^' | '$' | '!' | '|' | '=' | '+' => colors.syn_operator,
+                _ => colors.text_editor,
+            };
+            job.append(
+                &c.to_string(),
+                0.0,
+                TextFormat {
+                    font_id: font_id.clone(),
+                    color,
+                    ..Default::default()
+                },
+            );
+            i += 1;
+        }
+    }
+
+    job
+}
+
+fn highlight_batch(text: &str, colors: &ThemeColors, font_size: f32) -> LayoutJob {
+    let mut job = LayoutJob::default();
+    let font_id = FontId::monospace(font_size);
+
+    let keywords = [
+        "echo", "set", "if", "else", "goto", "call", "exit", "pause", "rem",
+        "for", "in", "do", "shift", "start", "cd", "chdir", "dir", "copy",
+        "xcopy", "robocopy", "del", "erase", "move", "ren", "rename", "md",
+        "mkdir", "rd", "rmdir", "cls", "title", "color", "choice", "setlocal",
+        "endlocal", "enabledelayedexpansion", "disabledelayedexpansion",
+        "exist", "defined", "not", "errorlevel", "equ", "neq", "lss", "leq",
+        "gtr", "geq", "on", "off",
+    ];
+
+    for line in text.split_inclusive('\n') {
+        let trimmed = line.trim_start();
+        let upper_trimmed = trimmed.to_uppercase();
+        if upper_trimmed.starts_with("REM ")
+            || upper_trimmed.starts_with("REM\t")
+            || upper_trimmed == "REM\n"
+            || upper_trimmed == "REM\r\n"
+            || upper_trimmed == "REM"
+            || trimmed.starts_with("::")
+            || upper_trimmed.starts_with("@REM ")
+            || upper_trimmed.starts_with("@REM\t")
+        {
+            job.append(
+                line,
+                0.0,
+                TextFormat {
+                    font_id: font_id.clone(),
+                    color: colors.syn_comment,
+                    ..Default::default()
+                },
+            );
+            continue;
+        }
+
+        if trimmed.starts_with(':') && !trimmed.starts_with("::") {
+            job.append(
+                line,
+                0.0,
+                TextFormat {
+                    font_id: font_id.clone(),
+                    color: colors.syn_function,
+                    ..Default::default()
+                },
+            );
+            continue;
+        }
+
+        let chars: Vec<char> = line.chars().collect();
+        let len = chars.len();
+        let mut i = 0;
+
+        while i < len {
+            if chars[i] == '"' {
+                let start = i;
+                i += 1;
+                while i < len && chars[i] != '"' && chars[i] != '\n' {
+                    i += 1;
+                }
+                if i < len && chars[i] == '"' {
+                    i += 1;
+                }
+                let s: String = chars[start..i].iter().collect();
+                job.append(
+                    &s,
+                    0.0,
+                    TextFormat {
+                        font_id: font_id.clone(),
+                        color: colors.syn_string,
+                        ..Default::default()
+                    },
+                );
+                continue;
+            }
+
+            if chars[i] == '%' || chars[i] == '!' {
+                let delim = chars[i];
+                let start = i;
+                i += 1;
+                if delim == '%' && i < len && (chars[i].is_ascii_digit() || chars[i] == '~' || chars[i] == '*') {
+                    while i < len && (chars[i].is_alphanumeric() || chars[i] == '~' || chars[i] == '$' || chars[i] == ':') {
+                        i += 1;
+                    }
+                } else {
+                    while i < len && chars[i] != delim && chars[i] != '\n' && !chars[i].is_whitespace() {
+                        i += 1;
+                    }
+                    if i < len && chars[i] == delim {
+                        i += 1;
+                    }
+                }
+                let s: String = chars[start..i].iter().collect();
+                job.append(
+                    &s,
+                    0.0,
+                    TextFormat {
+                        font_id: font_id.clone(),
+                        color: colors.syn_type,
+                        ..Default::default()
+                    },
+                );
+                continue;
+            }
+
+            if chars[i].is_alphanumeric() || chars[i] == '_' || chars[i] == '@' {
+                let start = i;
+                while i < len && (chars[i].is_alphanumeric() || chars[i] == '_' || chars[i] == '@') {
+                    i += 1;
+                }
+                let word: String = chars[start..i].iter().collect();
+                let clean_word = word.trim_start_matches('@');
+                let is_kw = keywords.iter().any(|k| k.eq_ignore_ascii_case(clean_word));
+                let color = if is_kw {
+                    colors.syn_keyword
+                } else {
+                    colors.text_editor
+                };
+                job.append(
+                    &word,
+                    0.0,
+                    TextFormat {
+                        font_id: font_id.clone(),
+                        color,
+                        ..Default::default()
+                    },
+                );
+                continue;
+            }
+
+            let c = chars[i];
+            let color = match c {
+                '=' | '|' | '>' | '<' | '&' => colors.syn_operator,
+                _ => colors.text_editor,
+            };
+            job.append(
+                &c.to_string(),
+                0.0,
+                TextFormat {
+                    font_id: font_id.clone(),
+                    color,
+                    ..Default::default()
+                },
+            );
+            i += 1;
+        }
+    }
+
+    job
+}
+
+fn highlight_shell(text: &str, colors: &ThemeColors, font_size: f32) -> LayoutJob {
+    let mut job = LayoutJob::default();
+    let font_id = FontId::monospace(font_size);
+
+    let keywords = [
+        "if", "then", "else", "elif", "fi", "case", "esac", "for", "select",
+        "while", "until", "do", "done", "in", "function", "time", "echo",
+        "printf", "read", "exit", "return", "export", "source", "local",
+        "declare", "typeset", "readonly", "alias", "test", "exec", "trap",
+        "shift", "unset", "set", "eval", "true", "false",
+    ];
+
+    let chars: Vec<char> = text.chars().collect();
+    let len = chars.len();
+    let mut i = 0;
+
+    while i < len {
+        if chars[i] == '#' {
+            let start = i;
+            while i < len && chars[i] != '\n' {
+                i += 1;
+            }
+            let s: String = chars[start..i].iter().collect();
+            job.append(
+                &s,
+                0.0,
+                TextFormat {
+                    font_id: font_id.clone(),
+                    color: colors.syn_comment,
+                    ..Default::default()
+                },
+            );
+            continue;
+        }
+
+        if chars[i] == '"' || chars[i] == '\'' || chars[i] == '`' {
+            let q = chars[i];
+            let start = i;
+            i += 1;
+            while i < len {
+                if chars[i] == '\\' && i + 1 < len {
+                    i += 2;
+                    continue;
+                }
+                if chars[i] == q {
+                    i += 1;
+                    break;
+                }
+                if chars[i] == '\n' && q == '\'' {
+                    break;
+                }
+                i += 1;
+            }
+            let s: String = chars[start..i].iter().collect();
+            job.append(
+                &s,
+                0.0,
+                TextFormat {
+                    font_id: font_id.clone(),
+                    color: colors.syn_string,
+                    ..Default::default()
+                },
+            );
+            continue;
+        }
+
+        if chars[i] == '$' {
+            let start = i;
+            i += 1;
+            if i < len && chars[i] == '{' {
+                while i < len && chars[i] != '}' && chars[i] != '\n' {
+                    i += 1;
+                }
+                if i < len && chars[i] == '}' {
+                    i += 1;
+                }
+            } else if i < len && (chars[i].is_ascii_digit() || chars[i] == '?' || chars[i] == '$' || chars[i] == '@' || chars[i] == '*' || chars[i] == '#') {
+                i += 1;
+            } else {
+                while i < len && (chars[i].is_alphanumeric() || chars[i] == '_') {
+                    i += 1;
+                }
+            }
+            let s: String = chars[start..i].iter().collect();
+            job.append(
+                &s,
+                0.0,
+                TextFormat {
+                    font_id: font_id.clone(),
+                    color: colors.syn_type,
+                    ..Default::default()
+                },
+            );
+            continue;
+        }
+
+        if chars[i].is_alphanumeric() || chars[i] == '_' {
+            let start = i;
+            while i < len && (chars[i].is_alphanumeric() || chars[i] == '_') {
+                i += 1;
+            }
+            let word: String = chars[start..i].iter().collect();
+            let is_kw = keywords.contains(&word.as_str());
+            let color = if is_kw {
+                colors.syn_keyword
+            } else {
+                colors.text_editor
+            };
+            job.append(
+                &word,
+                0.0,
+                TextFormat {
+                    font_id: font_id.clone(),
+                    color,
+                    ..Default::default()
+                },
+            );
+            continue;
+        }
+
+        let c = chars[i];
+        let color = match c {
+            '|' | '&' | ';' | '>' | '<' | '=' | '!' | '(' | ')' | '[' | ']' => colors.syn_operator,
+            _ => colors.text_editor,
+        };
+        job.append(
+            &c.to_string(),
+            0.0,
+            TextFormat {
+                font_id: font_id.clone(),
+                color,
+                ..Default::default()
+            },
+        );
+        i += 1;
+    }
+
+    job
+}
+
+fn highlight_powershell(text: &str, colors: &ThemeColors, font_size: f32) -> LayoutJob {
+    let mut job = LayoutJob::default();
+    let font_id = FontId::monospace(font_size);
+
+    let keywords = [
+        "param", "function", "filter", "workflow", "configuration", "if",
+        "else", "elseif", "switch", "foreach", "for", "while", "do", "until",
+        "break", "continue", "return", "exit", "try", "catch", "finally",
+        "throw", "trap", "in", "class", "enum", "using", "data", "process",
+        "begin", "end", "dynamicparam",
+    ];
+
+    let operators = [
+        "-eq", "-ne", "-gt", "-ge", "-lt", "-le", "-like", "-notlike",
+        "-match", "-notmatch", "-replace", "-contains", "-notcontains",
+        "-in", "-notin", "-is", "-isnot", "-and", "-or", "-not", "-xor",
+    ];
+
+    let chars: Vec<char> = text.chars().collect();
+    let len = chars.len();
+    let mut i = 0;
+
+    while i < len {
+        // Block comment <# ... #>
+        if i + 1 < len && chars[i] == '<' && chars[i + 1] == '#' {
+            let start = i;
+            i += 2;
+            while i + 1 < len && !(chars[i] == '#' && chars[i + 1] == '>') {
+                i += 1;
+            }
+            if i + 1 < len {
+                i += 2;
+            } else {
+                i = len;
+            }
+            let s: String = chars[start..i].iter().collect();
+            job.append(
+                &s,
+                0.0,
+                TextFormat {
+                    font_id: font_id.clone(),
+                    color: colors.syn_comment,
+                    ..Default::default()
+                },
+            );
+            continue;
+        }
+
+        // Line comment # ...
+        if chars[i] == '#' {
+            let start = i;
+            while i < len && chars[i] != '\n' {
+                i += 1;
+            }
+            let s: String = chars[start..i].iter().collect();
+            job.append(
+                &s,
+                0.0,
+                TextFormat {
+                    font_id: font_id.clone(),
+                    color: colors.syn_comment,
+                    ..Default::default()
+                },
+            );
+            continue;
+        }
+
+        if chars[i] == '"' || chars[i] == '\'' {
+            let q = chars[i];
+            let start = i;
+            i += 1;
+            while i < len {
+                if chars[i] == '`' && i + 1 < len {
+                    i += 2;
+                    continue;
+                }
+                if chars[i] == q {
+                    i += 1;
+                    break;
+                }
+                if chars[i] == '\n' {
+                    break;
+                }
+                i += 1;
+            }
+            let s: String = chars[start..i].iter().collect();
+            job.append(
+                &s,
+                0.0,
+                TextFormat {
+                    font_id: font_id.clone(),
+                    color: colors.syn_string,
+                    ..Default::default()
+                },
+            );
+            continue;
+        }
+
+        if chars[i] == '$' {
+            let start = i;
+            i += 1;
+            while i < len && (chars[i].is_alphanumeric() || chars[i] == '_' || chars[i] == ':') {
+                i += 1;
+            }
+            let s: String = chars[start..i].iter().collect();
+            job.append(
+                &s,
+                0.0,
+                TextFormat {
+                    font_id: font_id.clone(),
+                    color: colors.syn_type,
+                    ..Default::default()
+                },
+            );
+            continue;
+        }
+
+        if chars[i] == '-' && i + 1 < len && chars[i + 1].is_alphabetic() {
+            let start = i;
+            i += 1;
+            while i < len && (chars[i].is_alphanumeric() || chars[i] == '_') {
+                i += 1;
+            }
+            let word: String = chars[start..i].iter().collect();
+            let lower = word.to_lowercase();
+            let is_op = operators.contains(&lower.as_str());
+            let color = if is_op {
+                colors.syn_operator
+            } else {
+                colors.syn_function
+            };
+            job.append(
+                &word,
+                0.0,
+                TextFormat {
+                    font_id: font_id.clone(),
+                    color,
+                    ..Default::default()
+                },
+            );
+            continue;
+        }
+
+        if chars[i] == '[' {
+            let start = i;
+            i += 1;
+            let mut is_type = false;
+            while i < len && chars[i] != ']' && chars[i] != '\n' {
+                if chars[i].is_alphanumeric() || chars[i] == '.' || chars[i] == '_' {
+                    is_type = true;
+                }
+                i += 1;
+            }
+            if i < len && chars[i] == ']' && is_type {
+                i += 1;
+                let s: String = chars[start..i].iter().collect();
+                job.append(
+                    &s,
+                    0.0,
+                    TextFormat {
+                        font_id: font_id.clone(),
+                        color: colors.syn_type,
+                        ..Default::default()
+                    },
+                );
+                continue;
+            } else {
+                i = start;
+            }
+        }
+
+        if chars[i].is_alphanumeric() || chars[i] == '_' {
+            let start = i;
+            while i < len && (chars[i].is_alphanumeric() || chars[i] == '_' || chars[i] == '-') {
+                i += 1;
+            }
+            let word: String = chars[start..i].iter().collect();
+            let lower = word.to_lowercase();
+            let is_kw = keywords.contains(&lower.as_str());
+            let is_cmdlet = word.contains('-');
+            let color = if is_kw {
+                colors.syn_keyword
+            } else if is_cmdlet {
+                colors.syn_function
+            } else {
+                colors.text_editor
+            };
+            job.append(
+                &word,
+                0.0,
+                TextFormat {
+                    font_id: font_id.clone(),
+                    color,
+                    ..Default::default()
+                },
+            );
+            continue;
+        }
+
+        let c = chars[i];
+        let color = match c {
+            '|' | '=' | '!' | '+' | '*' | '/' | '%' | '&' => colors.syn_operator,
+            _ => colors.text_editor,
+        };
+        job.append(
+            &c.to_string(),
+            0.0,
+            TextFormat {
+                font_id: font_id.clone(),
+                color,
+                ..Default::default()
+            },
+        );
+        i += 1;
+    }
+
+    job
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_language_detection() {
+        assert_eq!(Language::from_path(Path::new("README.md")), Language::Markdown);
+        assert_eq!(Language::from_path(Path::new(".htaccess")), Language::Htaccess);
+        assert_eq!(Language::from_path(Path::new("subdir/.htaccess")), Language::Htaccess);
+        assert_eq!(Language::from_path(Path::new(".gitignore")), Language::GitIgnore);
+        assert_eq!(Language::from_path(Path::new(".gitmodules")), Language::GitIgnore);
+        assert_eq!(Language::from_path(Path::new("build.cmd")), Language::Batch);
+        assert_eq!(Language::from_path(Path::new("install.bat")), Language::Batch);
+        assert_eq!(Language::from_path(Path::new("deploy.sh")), Language::Shell);
+        assert_eq!(Language::from_path(Path::new("script.bash")), Language::Shell);
+        assert_eq!(Language::from_path(Path::new("start.ps1")), Language::PowerShell);
+    }
+
+    #[test]
+    fn test_syntax_highlighting_runs() {
+        let colors = ThemeColors::from_mode(crate::theme::ThemeMode::Dark);
+        let font_size = 14.0;
+
+        let md = "# Title\n- Item 1\n`code` and **bold**";
+        let job = highlight(md, Language::Markdown, &colors, font_size);
+        assert!(!job.sections.is_empty());
+
+        let htaccess = "RewriteEngine On\nRewriteRule ^(.*)$ index.php [L,QSA]";
+        let job = highlight(htaccess, Language::Htaccess, &colors, font_size);
+        assert!(!job.sections.is_empty());
+
+        let gitignore = "# Comment\nnode_modules/\n*.log\n!important.log";
+        let job = highlight(gitignore, Language::GitIgnore, &colors, font_size);
+        assert!(!job.sections.is_empty());
+
+        let cmd = "@echo off\nset VAR=value\ngoto end\n:end\npause";
+        let job = highlight(cmd, Language::Batch, &colors, font_size);
+        assert!(!job.sections.is_empty());
+
+        let sh = "#!/bin/bash\nif [ $? -eq 0 ]; then\n  echo \"success\"\nfi";
+        let job = highlight(sh, Language::Shell, &colors, font_size);
+        assert!(!job.sections.is_empty());
+
+        let ps1 = "# PowerShell\n$path = \"C:\\test\"\nGet-ChildItem -Path $path\nWrite-Host $true";
+        let job = highlight(ps1, Language::PowerShell, &colors, font_size);
+        assert!(!job.sections.is_empty());
+    }
 }

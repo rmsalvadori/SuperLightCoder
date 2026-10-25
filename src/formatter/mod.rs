@@ -13,12 +13,15 @@ pub fn format_code(text: &str, lang: Language) -> String {
         | Language::Java
         | Language::Php
         | Language::Go
-        | Language::Perl => format_brace_language(text, 4),
+        | Language::Perl
+        | Language::Shell
+        | Language::PowerShell => format_brace_language(text, 4),
         Language::Python => format_python(text),
         Language::Pascal => format_pascal(text),
         Language::Lua | Language::Ruby => format_lua_ruby(text),
         Language::Markdown => format_markdown(text),
         Language::Toml => format_toml(text),
+        Language::Batch | Language::Htaccess | Language::GitIgnore => format_clean_lines(text),
         Language::PlainText => text.to_string(),
     }
 }
@@ -631,6 +634,28 @@ pub fn format_lua_ruby(text: &str) -> String {
 
 /// Formatter for Markdown
 pub fn format_markdown(text: &str) -> String {
+    let mut result = String::new();
+    let mut empty_line_count = 0;
+
+    for raw_line in text.lines() {
+        let trimmed_end = raw_line.trim_end();
+        if trimmed_end.is_empty() {
+            empty_line_count += 1;
+            if empty_line_count <= 2 && !result.is_empty() {
+                result.push('\n');
+            }
+            continue;
+        }
+        empty_line_count = 0;
+
+        result.push_str(trimmed_end);
+        result.push('\n');
+    }
+
+    result.trim_end().to_string()
+}
+
+pub fn format_clean_lines(text: &str) -> String {
     let mut result = String::new();
     let mut empty_line_count = 0;
 
