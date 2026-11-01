@@ -7,6 +7,7 @@ pub struct WindowConfig {
     pub maximized: bool,
     pub last_file: Option<PathBuf>,
     pub word_wrap: bool,
+    pub reopen_last_file: bool,
 }
 
 impl Default for WindowConfig {
@@ -17,6 +18,7 @@ impl Default for WindowConfig {
             maximized: false,
             last_file: None,
             word_wrap: false,
+            reopen_last_file: false,
         }
     }
 }
@@ -68,6 +70,11 @@ pub fn load_window_state() -> WindowConfig {
                                 config.word_wrap = b;
                             }
                         }
+                        "reopen_last_file" => {
+                            if let Ok(b) = parts[1].parse::<bool>() {
+                                config.reopen_last_file = b;
+                            }
+                        }
                         _ => {}
                     }
                 }
@@ -83,11 +90,12 @@ pub fn save_window_state(config: &WindowConfig) {
         let mut path = dir;
         path.push("window_state.txt");
         let mut content = format!(
-            "width={}\nheight={}\nmaximized={}\nword_wrap={}\n",
+            "width={}\nheight={}\nmaximized={}\nword_wrap={}\nreopen_last_file={}\n",
             config.width.round() as i32,
             config.height.round() as i32,
             config.maximized,
-            config.word_wrap
+            config.word_wrap,
+            config.reopen_last_file
         );
         if let Some(ref lf) = config.last_file {
             content.push_str(&format!("last_file={}\n", lf.to_string_lossy()));

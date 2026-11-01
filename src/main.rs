@@ -21,11 +21,17 @@ fn main() -> eframe::Result<()> {
     let win_cfg = window_state::load_window_state();
 
     // Check if a file path was passed as argument (e.g. from Windows context menu or CLI),
-    // otherwise reopen the last opened file if it exists.
+    // otherwise reopen the last opened file only if the user enabled that option in settings.
     let target_file = env::args()
         .nth(1)
         .map(PathBuf::from)
-        .or_else(|| win_cfg.last_file.clone().filter(|p| p.is_file()));
+        .or_else(|| {
+            if win_cfg.reopen_last_file {
+                win_cfg.last_file.clone().filter(|p| p.is_file())
+            } else {
+                None
+            }
+        });
 
     let (screen_w, screen_h) = get_screen_size();
     let pos_x = ((screen_w as f32 - win_cfg.width) / 2.0).max(0.0);

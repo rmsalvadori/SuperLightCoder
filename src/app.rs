@@ -475,6 +475,8 @@ impl SuperLightCoderApp {
         self.cursor_col = 1;
         self.selection_count = None;
         self.history.clear();
+        self.win_config.last_file = None;
+        crate::window_state::save_window_state(&self.win_config);
         self.set_status("Novo arquivo criado");
     }
 
@@ -1373,6 +1375,36 @@ impl SuperLightCoderApp {
                                         self.is_modified = true;
                                     }
                                 });
+
+                                ui.add_space(6.0);
+                                ui.separator();
+                                ui.add_space(4.0);
+
+                                let mut reopen = self.win_config.reopen_last_file;
+                                if ui
+                                    .checkbox(&mut reopen, "Reabrir último arquivo ao iniciar")
+                                    .on_hover_text("Ao iniciar sem argumentos, reabre automaticamente o último arquivo que estava aberto.")
+                                    .changed()
+                                {
+                                    self.win_config.reopen_last_file = reopen;
+                                    crate::window_state::save_window_state(&self.win_config);
+                                    if reopen {
+                                        self.set_status("Reabertura automática do último arquivo ativada.");
+                                    } else {
+                                        self.set_status("Reabertura automática desativada.");
+                                    }
+                                }
+
+                                let mut wrap = self.word_wrap;
+                                if ui
+                                    .checkbox(&mut wrap, "Quebra automática de linha (Word Wrap)")
+                                    .on_hover_text("Quebra visualmente as linhas longas ajustando-as ao tamanho da janela.")
+                                    .changed()
+                                {
+                                    self.word_wrap = wrap;
+                                    self.win_config.word_wrap = wrap;
+                                    crate::window_state::save_window_state(&self.win_config);
+                                }
                             });
 
                         ui.add_space(8.0);
@@ -2152,7 +2184,10 @@ impl eframe::App for SuperLightCoderApp {
                                 .layouter(&mut layouter)
                                 .frame(false);
 
-                            if !self.word_wrap {
+                            if self.word_wrap {
+                                let wrap_w = (ui.available_width() - 8.0).max(100.0);
+                                text_edit = text_edit.desired_width(wrap_w);
+                            } else {
                                 text_edit = text_edit.desired_width(f32::INFINITY);
                             }
 
